@@ -1,0 +1,385 @@
+---
+title: "ASSIGNMENT 1 : STAT20230"
+author: "Shubh Gaur(23200555)"
+editor: visual
+format:
+  html: 
+    embed-resources: true
+  pdf: default
+---
+
+# QUESTION 3
+
+## Importing Libraries
+
+```{r}
+#| message: false
+library(tidyverse)
+library(knitr)
+library(ggplot2)
+library(corrplot)
+library(data.table)
+```
+
+## Load the bodyfat dataset
+
+```{r}
+library(mfp)
+data("bodyfat")
+head(bodyfat)
+```
+
+## Fitting a linear regression to Y : body fat (%) versus X: weight (in kg)
+
+```{r}
+y=bodyfat$brozek
+x=bodyfat$weight/2.2
+ggplot(data=NULL,aes(x = x, y = y))+ geom_point() +
+  geom_smooth(method = 'lm')+
+  labs(x = "Weight(Kg)",
+    y = "Body Fat Percentage(%)",
+    title = "Scatter Plot of Body fat percentage Vs. Weight"
+  )
+```
+
+```{r}
+n=length(x)
+beta1 = (sum(x*y) - n*mean(x)*mean(y))/(sum(x^2) - n*mean(x)^2)
+beta0 = mean(y)-beta1*mean(x)
+print(paste('Slope of linear regression=',beta1))
+print(paste('Y Intercept=',beta0))
+```
+
+### Comparing coefficients using lm
+
+```{r}
+model1=lm(y~x)
+model1
+```
+
+We can see that we have correctly fitted the model by comparing the coefficients.
+
+#### A
+
+beta_0 is the y intercept which is the value when X=0 which in this case is a negative value which doesn't make sense because body fat percentage can never be negative and also body fat percentage for a weightless(X=Weight=0) body doesn't make sense.Also, beta_0 is obtained by setting all the variables to zero,which in real world applications doesn't have a meaningful interpretation.Eg. in a model predicting house prices, what does it mean for all the variables (bedrooms,baths,etc.) to be 0, such an interpretation lacks practical significance.
+
+Because of the above reasons, beta_0 interpretation should be avoided.
+
+#### B
+
+```{r}
+x1=x # weight in kg
+x2=bodyfat$abdomen
+
+model2=lm(y~x1+x2)
+
+cat(paste0("Regression Coeffecient of weight(X1) for the model with single covariate:\n",
+            "X1: Weight(in Kgs)\n",
+            "= ",beta1,"\n"))
+
+cat(paste0("Regression Coeffecient of weight(X1) for the model with dual covariates:\n",
+            "X1: Weight(in Kgs)\n",
+            "X2: Abdomen circumference(cms)\n",
+            "= ",coef(model2)[2],"\n"))
+
+cat(paste0("Regression coefficient of Abdomen Circumference(X2) in the new model= "
+           ,coef(model2)[3],"\n"))
+```
+
+The estimated effect of weight has changed from a positive value in the first model to a negative value in the second model.
+
+The reason for this is the new covariate : Abdomen Circumference(cms) is highly positively correlated with the dependent variable: Bodyfat Percentage and first covariate: Weight(in Kgs) and acting as a confounder.
+
+Lets verify the above claim using a plot of correlation:
+
+```{r}
+corrplot(cor(data.frame(y,x1,x2)))
+```
+
+As we can see the covariate X2 is highly positively correlated with dependent variable Y & covariate X1. So, as X2 gets larger X1 will also get larger and the outcome would be on overestimation of Y(if the regression coefficient of X1 had not changed signs in the second model): the dependent variable. So, to avoid this overestimation, the regression coefficient of X1 in the second model has changed its sign from positive to negative due to its high correlation with X2.
+
+#### C
+
+```{r}
+summary(model1)
+summary(model2)
+cat(paste0("Coeffiecient of determination for model 1= ",
+           summary(model1)$r.squared),"\n")
+cat(paste0("Coeffiecient of determination for model 2= ",
+           summary(model2)$r.squared),"\n")
+```
+
+It is evident from the coefficient of determination that the second model provides a better fit for the data and this is due to the fact that X2 was a confounding variable and as long as it was not introduced ,there was bias in the model which contributed to the relatively lower value for coefficient of determination.
+
+# QUESTION 4
+
+## Reading Data File
+
+```{r}
+data=read.csv('data_simulation.csv')
+head(data)
+```
+
+## Generating 1000 samples of size 300 to get a sampling distribution for regression coefficients
+
+```{r}
+n = 300
+values = matrix(NA, ncol =4, nrow = 1000)
+for(i in 1:1000){
+sampled_indexes = sample(1:10000, size = n) 
+data_sample = data[sampled_indexes,]
+model=lm(y~X1+X2+X3,data=data_sample)
+values[i,]=coef(model)
+}
+```
+
+#### A
+
+```{r}
+df=data.frame(values) 
+colnames(df)=c('beta_0','beta_1','beta_2','beta_3')
+# casting the dataframe into long format
+df=pivot_longer(df, cols = everything(), names_to = "Variable")
+
+#plotting histogram for sampling distribution of regression coefficients
+ggplot(df, aes(x = value, fill = Variable)) +
+  geom_histogram(alpha = 0.7) +
+  labs(
+    title = "Sampling distribution of regression coefficients",
+    x = "Values",
+    y = "Frequency"
+  ) + 
+  theme_linedraw() + facet_wrap(~Variable, scales = "free_x")
+```
+
+#### B
+
+```{r}
+#PLOTTING CORRELATION BETWEEN ESTIMATES
+df=data.frame(values) 
+colnames(df)=c('beta_0','beta_1','beta_2','beta_3')
+correlation_mat=cor(df)
+kable(correlation_mat) #correlation matrix
+```
+
+```{r}
+#correlation plot
+corrplot(correlation_mat)
+```
+
+#### C
+
+As we are able to see from the correlation plot that beta_0 is highly correlated(in the negative direction) with beta_1 and beta_3 and a very small correlation with with beta_2.However, beta_2, beta_3, beta_1 don't have significant correlation with each other.
+
+# Question 6
+
+### Reading the data
+
+```{r}
+#Reading the dataset and removing the extra column which was acting as row indices
+abalone_df=read.csv('abalone.csv') |> select(-X)
+```
+
+#### A
+
+```{r}
+#changing sex variable to a categorical type using factor
+abalone_df$sex=factor(abalone_df$sex)
+
+#plotting boxplots for different genders
+
+ggplot(abalone_df, aes(y = shucked_weight, fill = sex)) +
+  geom_boxplot() +
+  labs(title = "Boxplots for shucked weight classified by sex")
+```
+
+It is evident from the box plot that there is some difference in shucked weight between male and female abalones.The minimum shucked weight in male abalones is a little bit higher than the maximum shucked weight in female abalones.However,the difference in shucked weight between male and female is very small and thus insignificant.
+
+#### B
+
+```{r}
+#Adding a variable age
+abalone_df$age=1.5*abalone_df$rings
+
+#plotting probability distribution plot for abalone's age
+ggplot(abalone_df, aes(x = age)) +
+  geom_density(fill = 'purple') +
+  labs(
+    title = "Density plot for age of abalones",
+    x = "Age(in years)"
+  ) 
+```
+
+The distribution is right skewed and not symmetric, as evident from the distribution plot.
+
+#### C
+
+```{r}
+# Defining age intervals for categories
+category_intervals_age=c(5,10,15,20,Inf)
+
+# Defining labels for intervals
+
+#Added an extra age label of '0-5' as distribution plot for this interval's category was plotted as NA
+abalone_df_filtered=abalone_df[abalone_df$age>5,]
+category_labels_age=c('5-10','10-15','15-20','20+')
+
+
+#Adding a column based on specified categories for age in dataframe
+abalone_df_filtered$age_category=cut(abalone_df_filtered$age, 
+                                     breaks = category_intervals_age, 
+                                     labels = category_labels_age, 
+                                     right = TRUE)
+
+#Plotting distribution of shucked weight per age category
+ggplot(abalone_df_filtered, aes(x = shucked_weight, fill = age_category)) +
+  geom_histogram() +
+  labs(
+    title = "Distribution of Weight for different age category",
+    x = "Years",
+    fill="Age Categories(in years)"
+  ) +
+  facet_wrap(~age_category)
+```
+
+It is evident from the distribution for different age categories that the modal weight is decreasing at each age category in the increasing sequence. Also, the skewness of data is decreasing as we move from one category to other.
+
+#### D
+
+```{r}
+#select numeric variables of abalone_df
+abalone_df_numeric <- abalone_df |>
+  select_if(is.numeric)
+
+#computing correlation matrix
+correlation_mat=cor(abalone_df_numeric)
+correlation_mat
+
+#finding index of shucked_weight in correlation matrix
+index=which(colnames(correlation_mat)=="shucked_weight")
+
+#finding index with max correlation
+#excluding shucked_weight's correlation with self 
+max_index=which.max(correlation_mat[index,-index])
+
+cat(paste0('Shucked weight has max correlation with ',
+           colnames(correlation_mat)[max_index],
+           ' and the correlation coefficient for the same = ',
+           correlation_mat[index,max_index],'\n'))
+```
+
+#### E
+
+```{r}
+plot1 = ggplot(abalone_df, aes(x = length, y= shucked_weight)) + 
+        geom_point() + 
+        labs(title = 'Shucked Weight Vs Length', y = 'Shucked Weight (grams)',
+             x='Length')
+
+plot2 = ggplot(abalone_df, aes(x = diameter, y= shucked_weight)) + 
+        geom_point() + 
+        labs(title = 'Shucked Weight Vs Diameter', y = 'Shucked Weight (grams)',
+             x='Diameter')
+
+plot3 = ggplot(abalone_df, aes(x = height, y= shucked_weight)) + 
+        geom_point() + 
+        labs(title = 'Shucked Weight Vs Height', y = 'Shucked Weight (grams)',
+             x='Height')
+
+```
+
+```{r}
+print(plot1)
+```
+
+```{r}
+print(plot2)
+```
+
+```{r}
+print(plot3)
+```
+
+#### F
+
+```{r}
+# Boxplot for height to detect outliers
+ggplot(abalone_df, aes(y = height)) +
+  geom_boxplot() +
+  labs(title = 'Boxplot for height',y='Height(in mm)')
+```
+
+#### G
+
+```{r}
+# fitting a linear regression model between shucked_weight and height
+model1=lm(shucked_weight~height,data=abalone_df)
+```
+
+```{r}
+# Model Summary
+summary(model1)
+```
+
+```{r}
+#removing outliers in height using IQR method
+#calculating quartiles
+q1 <- quantile(abalone_df$height, 0.25)
+q3 <- quantile(abalone_df$height, 0.75)
+iqr <- q3 - q1
+
+#calculating upper and lower limits
+lower_limit = q1 - 1.5 * iqr
+upper_limit = q3 + 1.5 * iqr
+
+#filtering dataset
+abalone_df_filtered= filter(abalone_df,(height >= lower_limit) & 
+                              (height <= upper_limit))
+
+#boxplot of height with filtered values for verification
+ggplot(abalone_df_filtered, aes(y = height)) +
+  geom_boxplot() +
+  labs(title = 'Boxplot for height',y='Height(in mm)')
+```
+
+As we can see from the boxplot of height with filtered values that the outliers have been removed.
+
+```{r}
+# fitting a linear regression model between shucked_weight and height 
+# after filtering out outliers
+model2=lm(shucked_weight~height,data=abalone_df_filtered)
+```
+
+```{r}
+# Model Summary
+summary(model2)
+```
+
+As we can see, the slope of the regression line has increased a bit after removing outliers in height and also the coefficient of determination has improved for the second model which means that outliers can have an effect on estimating regression slope as outliers tend to pull the regression line towards itself,therefore increasing the error in estimation and wider confidence intervals.
+
+#### H
+
+```{r}
+model=lm(shucked_weight ~ length + diameter + height + rings, data = abalone_df)
+summary(model)
+```
+
+Equation of Regression: $\hat{Y} = -0.4673450 + 1.0166016\cdot length + 0.7308167\cdot diameter + 0.6786035\cdot height - 0.0099401\cdot rings$ From the model summary, $R^2 = 0.8241$ which is better than the previous values of $R^2$, this means that our model can explain 82% variation in the output variable y: shucked_weight.Since the model with the current combination of predictors is better, we conclude that the set of predictors selected is statistically significant to explain the variation in shucked weight.
+
+#### I
+
+```{r}
+#Creating data table containing inputs for prediction 
+inputs = data.table(length = 0.456, diameter = 0.351, height = 0.102, rings = 13.5)
+
+# Getting prediction interval for the given input
+shucked_weight_predicted = predict(model, newdata = inputs, interval = "prediction",
+                                   level = 0.95)
+
+# Getting the upper and lower bound
+lower_limit =  shucked_weight_predicted[2]
+upper_limit = shucked_weight_predicted[3]
+
+cat("95% Prediction Interval for Shucked Weight:\n")
+cat(paste0("(",lower_limit," , ",upper_limit,")"))
+```

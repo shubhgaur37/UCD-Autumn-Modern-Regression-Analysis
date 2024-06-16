@@ -1,0 +1,700 @@
+---
+title: "MODERN REGRESSION ANALYSIS ASSIGNMENT-2"
+author: "Shubh Gaur - 23200555"
+format: 
+  html:
+   embed-resources: true
+  pdf: 
+    geometry:
+    - top=20mm
+    - left=15mm
+    - heightrounded
+execute: 
+  error: true
+---
+
+## Importing libraries
+
+```{r}
+#| message: false
+library(tidyverse)
+library(knitr)
+library(kableExtra)
+```
+
+### Question 3
+
+#### Reading the dataset
+
+Reading the crime.csv dataset using read.csv() fxn and printing the head to understand the structure of data.<br>
+
+```{r}
+crime_df = read.csv('Crimes.csv')
+head(crime_df,width=4,strict.width='cut')
+```
+
+Viewing the structure of the data.<br>
+
+```{r}
+str(crime_df,strict.width='cut',width=84)
+```
+
+Checking if there are any NA values in the dataframe and removing them if present.
+
+```{r}
+cat(paste("NA values in dataframe:",sum(is.na(crime_df))))
+```
+
+There are no null values in the dataframe. \### Visualizing relationships
+
+Creating scatter plots to visualize relationships between independent variables.
+
+For plotting combined scatter plots, we are converting the data frame from a wide format to a long format where data is grouped by covariate name and its corresponding value.
+
+```{r}
+
+# Reshape the data for ggplot
+crime_df_long <- gather(crime_df, key = "covariate", value = "value", -VR)
+
+# Create a scatter plot with regression line for each covariate
+ggplot(crime_df_long, aes(x = value, y = VR)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  facet_wrap(~covariate, scales = "free", nrow=2, ncol=2) +
+  labs(title = "Scatter Plot with Regression Line for Each Covariate")
+```
+
+Some outliers are present according to scatterplots,lets confirm the above fact using boxplots
+
+```{r}
+
+# Create a scatter plot with regression line for each covariate
+ggplot(crime_df_long, aes(x = covariate, y = value)) +
+  geom_boxplot() +
+  labs(title = "Combined Box Plots for Covariates")
+```
+
+Its is clear from the boxplot that the variable **MR** has outliers lets remove them using the IQR method and lets define a generic function for the same.
+
+```{r}
+remove_outliers <- function(data, variable_name, threshold = 1.5) {
+  # Calculate the quartiles
+  Q1 <- quantile(data[[variable_name]], 0.25)
+  Q3 <- quantile(data[[variable_name]], 0.75)
+
+  # Calculate the IQR (Interquartile Range)
+  IQR_value <- IQR(data[[variable_name]])
+
+  # Define the lower and upper bounds for outlier detection
+  lower_bound <- Q1 - threshold * IQR_value
+  upper_bound <- Q3 + threshold * IQR_value
+
+  # Identify outliers
+  outliers <- which(data[[variable_name]] < lower_bound | data[[variable_name]] > upper_bound)
+  
+  # Return the new dataframe
+  return(data[-outliers, ])
+}
+```
+
+Applying the function for removing outliers in **MR** variable and creating box plot for the same.
+
+```{r}
+crime_df_outliers_removed=remove_outliers(crime_df,'MR')
+
+ggplot(crime_df_outliers_removed)+
+  geom_boxplot(aes(x = MR))+
+  labs(title = "Boxplot for MR after removing outliers",y='Value')
+```
+
+Its clear from the boxplot that the outliers have been removed.
+
+#### A
+
+As the data has been preprocessed we will go to the next step which is building all possible linear regression models. We will create a function that will generate all possible subsets of covariates using combn() fxn and build models using them
+
+```{r}
+all_linear_models <- function(data,response){
+  
+  predictor_vars <- setdiff(names(data), response)
+  
+  covariate_subsets <- lapply(1:length(predictor_vars), function(i) combn(predictor_vars, i, simplify = FALSE))
+                        
+  # Flatten the list of subsets
+  covariate_subsets <- unlist(covariate_subsets, recursive = FALSE)
+  
+  ##building the model with just the intercept
+  intercept_model=lm(as.formula(paste(response,'~ 1')), data = data)
+  models=list(intercept_model)
+  
+  for (i in covariate_subsets){
+      formula_str <- paste(response, "~", paste(i, collapse = " + "))
+      formula <- as.formula(formula_str)
+      models=c(models,list(lm(formula,data=data)))
+  }
+  return(models)
+}
+models=all_linear_models(crime_df_outliers_removed,"VR")
+```
+
+Lets check if all the models are present.We can do this by checking the length of the **models** list which should be 8.
+
+```{r}
+cat(paste('Count of generated models :',length(models)))
+```
+
+The total number of models are according to expectation.
+
+Now, Lets view the model summary for each of the models.
+
+##### Model 1
+
+```{r}
+summary(models[[1]])
+cat(paste("AIC for model 1 (intercept/null):",AIC(models[[1]])))
+```
+
+##### Model 2
+
+```{r}
+summary(models[[2]])
+cat(paste("AIC for model 2:",AIC(models[[2]])))
+```
+
+##### Model 3
+
+```{r}
+summary(models[[3]])
+cat(paste("AIC for model 3:",AIC(models[[3]])))
+```
+
+##### Model 4
+
+```{r}
+summary(models[[4]])
+cat(paste("AIC for model 4:",AIC(models[[4]])))
+```
+
+##### Model 5
+
+```{r}
+summary(models[[5]])
+cat(paste("AIC for model 5:",AIC(models[[5]])))
+```
+
+##### Model 6
+
+```{r}
+summary(models[[6]])
+cat(paste("AIC for model 6:",AIC(models[[6]])))
+```
+
+##### Model 7
+
+```{r}
+summary(models[[7]])
+cat(paste("AIC for model 7:",AIC(models[[7]])))
+```
+
+##### Model 8
+
+```{r}
+summary(models[[8]])
+cat(paste("AIC for model 8:",AIC(models[[8]])))
+```
+
+```{r}
+
+# Create a summary table
+model_results <- do.call(rbind, lapply(models, function(model) {
+  data.frame(
+    Covariates = paste(names(model$model)[-1], collapse = ", "),
+    AIC = AIC(model),
+    BIC = BIC(model),
+    Adjusted_R_squared = summary(model)$adj.r.squared
+  )
+}))
+model_results$Covariates[1]='Intercept/Null Model'
+# Print the table
+kable(model_results,caption = "Comparison between all possible linear models") |> kable_styling(full_width = TRUE,position = "center")
+```
+
+#### B
+
+According to the model comparison table, the 5th model with covariates **MR**,**M** has the least AIC and BIC values among all the models. Also, the Adjusted R Squared value for the mentioned model is the highest among all models which suggests that the 5th model is the best model.
+
+#### C
+
+Here we have implemented forward stepwise regression function using BIC which inputs two parameters: dataframe and name of the response variable.
+
+It outputs two parameters in the form of list: the best model, and the covariates selected(in character vector format) <br>
+
+The algorithm is as follows:<br>
+
+1.  Begin with a model that contains no covariate (other than the intercept). Run a linear regression and record the BIC. For now, this is our *current model*.
+
+2.  Find the most significant variable, i.e. the variable that lowers the BIC the most <br>
+
+<!-- -->
+
+a.  Run a linear regression with the *current model* plus one additional variable, and record the decrease in BIC.<br>
+b.  Repeat step 2a for each variable not included in the *current model*. <br>
+c.  Find the covariate which is decreasing BIC the most if added to the current model.<br>
+d.  Update the *current model* to include the variable that decreases the BIC the most.
+
+<!-- -->
+
+3.  If none of the variables lower the BIC then go to step 4. Otherwise repeat step 2 until adding variables no longer reduces the AIC.
+
+4.  Report your final chosen variables
+
+```{r}
+forward_stepwise_regression <- function(df,response){
+  
+  predictors=names(df)[names(df)!=response]
+  
+  #initializing the intercept model
+  intercept_model=lm(as.formula(paste(response,"~ 1")),data=df)
+  flag=TRUE #tells whether a suitable covariate can be added to reduce BIC
+  ctr=0#tells the count of covariates selected
+  best_BIC=BIC(intercept_model)
+  
+  final_covariates=c()#initialised an empty vector to store covariates of the best model
+  
+  #we will break out of the loop when BIC values are not reducing further due to the flag as it will remain FALSE in that case
+  
+  while(flag) {
+    covariate_expr=paste(final_covariates,collapse="+")
+    flag=FALSE
+    for (name in predictors){
+      if (!(name %in% final_covariates)){
+        #creating the formula to use in lm for selected covariates
+        formula=as.formula(paste(response,'~',covariate_expr,'+',name))
+        model=lm(formula,data=df)
+        
+        if (BIC(model)<best_BIC){
+          best_BIC=BIC(model)
+          best_model=model
+          best_covariate=name
+          #the flag will only toggle to true if a suitable covariate is found that decreases BIC if added to the current model
+          flag=TRUE 
+        }
+      }
+      }
+    if (flag){
+      final_covariates=c(final_covariates,best_covariate)
+    }
+    }
+  return(list(best_model,final_covariates))
+  }
+
+forward_selected_model = forward_stepwise_regression(crime_df_outliers_removed,'VR')
+selected_covariates=paste(forward_selected_model[[2]],collapse=",")
+cat(paste("Covariates selected:",selected_covariates))
+summary(forward_selected_model[[1]])
+```
+
+The best model according to forward_stepwise_regression is having covariates : **M** and **MR**,which is same as the best model found using **All Subsets Regression** approach .Therefore, In this case the forward_stepwise_regression was able to find the best possible subset of covariates for the linear model.
+
+#### D
+
+Forward stepwise regression is more efficient(computationally speaking) than considering all possible models (as in all subset regression), it does not guarantee finding the best model unlike all subset regression because it makes a series of decisions at each iteration. The final model obtained depends on the order of the covariates added.
+
+#### E
+
+Backward stepwise regression a.k.a backward feature selection using F test as a decision rule can also be implemented in a similar way to forward stepwise regression,the difference being that it will start with a model with all the covariates and will make decisions at each iteration for removing the covariates based on the p value of F statistic in the model present at the ith iteration.If the algorithm doesn't find any p values which are lesser than significance level at any iteration, then the model corresponding to that particular iteration is considered best and returned.
+
+In this function, we are returning a list containing the best model and the covariates used in it.
+
+The approach for the algorithm is implemented below.
+
+```{r}
+backward_stepwise_selection_F <- function(df,response,significance_level=0.05){
+  current_predictors=names(df)[names(df)!=response]
+  #formula for initial model with all covariates
+  curr_formula=as.formula(paste(response,"~",paste(current_predictors,collapse = "+")))
+  #initial model with all the covariates
+  final_model=aov(curr_formula,data=df)
+  final_model_summary=summary(final_model)
+  flag=TRUE
+  
+  while(flag){
+    flag=FALSE
+    p_values=head(final_model_summary[[1]]$`Pr(>F)`,-1) #get all entries except for the last one
+    #finding the covariates which have a p value smaller than 0.05
+    #Setting them to be the new predictors for the next model
+    current_predictors=trimws(head(rownames(final_model_summary[[1]]),-1)[p_values<significance_level])
+    if (length(current_predictors) == 0)
+      flag=FALSE
+    else{
+      curr_formula=as.formula(paste(response,"~",paste(current_predictors,collapse = "+")))
+      final_model=aov(curr_formula,data=df)
+      final_model_summary=summary(final_model)
+    }
+
+  }
+  final_model=lm(curr_formula,data=df)
+  
+  return (list(final_model,current_predictors))
+}
+backward_stepwise_regression_output=backward_stepwise_selection_F(crime_df_outliers_removed,"VR")
+model=backward_stepwise_regression_output[[1]]
+covariates=backward_stepwise_regression_output[[2]]
+cat(paste("Covariates used for the backward stepwise regression model:",paste(covariates,collapse=",")))
+summary(model)
+```
+
+### Question 4
+
+Reading data from football.csv.
+
+```{r}
+football_df = read.csv('football.csv')
+cat(paste("Number of records in the dataset:",nrow(football_df)))
+```
+
+Viewing the first 6 observations in the dataset.
+
+```{r}
+head(football_df,width=4,strict.width='cut')
+```
+
+#### A
+
+Fitting a model taking y as the response and x2,x7,x8 as the covariates.
+
+```{r}
+model=lm(y ~ x2 + x7 + x8,data=football_df)
+model1=model #for using later
+summary(model)
+```
+
+#### B
+
+Calculating SST, SSE and SSR.
+
+```{r}
+#making predictions on existing data 
+y_pred=predict(model)
+
+SST=sum((football_df$y-mean(football_df$y))**2)
+cat(paste("Total Sum of Squares, SST =",SST))
+
+SSE=sum((football_df$y-y_pred)**2)
+cat(paste("\nTotal Sum of Squares of Errors, SSE =",SSE))
+
+SSR=sum((y_pred-mean(football_df$y))**2)
+cat(paste("\nTotal Sum of Squares of Regression, SSR =",SSR))
+
+```
+
+The three quantities calculated above are related as SST = SSR + SSE. Lets verify by calculating SST using SSR and SSE calculated above.
+
+```{r}
+SST_verification=SSR + SSE
+cat(paste("SST calculated using the formula =",SST))
+cat(paste("\nSST calculated using the relation =",SST_verification))
+cat(paste("\nAre SST and SST_verification equal ? :",
+          all.equal(SST,SST_verification)))
+```
+
+Lets calculate the total degrees of freedom, given: df\[SSE\] = n-p-1 and df\[SSR\] = p where, n is total number of observations and p is total number of predictors, using a similar relationship compared to previous one i.e df\[SST\] = df\[SSE\] + df\[SSR\]
+
+```{r}
+df_SSR= ncol(select(football_df,x2,x7,x8))
+df_SSE= nrow(football_df) - ncol(select(football_df,x2,x7,x8)) -1
+df_SST= df_SSE + df_SSR
+cat(paste("Degrees of freedom, SSR =",df_SSR))
+cat(paste("\nDegrees of freedom, SSE =",df_SSE))
+cat(paste("\nCalculated degrees of freedom, SST =",df_SST))
+```
+
+Computing mean sum of squares.
+
+We can do this by dividing each of the sum of square by the respective degrees of freedom.
+
+```{r}
+MST=SST/df_SST
+MSE=SSE/df_SSE
+MSR=SSR/df_SSR
+cat(paste("MST =",MST))
+cat(paste("\nMSE =",MSE))
+cat(paste("\nMSR =",MSR))
+```
+
+#### C
+
+Fitting the linear regression model manually according to question specification.
+
+```{r}
+Y=football_df$y
+X=cbind(1,football_df$x2,football_df$x7,football_df$x8)
+
+#calculating regression coefficient estimates
+beta_hat=solve(t(X) %*% X) %*% (t(X) %*% Y)
+cat(paste("beta_0 =",beta_hat[1]))
+cat(paste("\nbeta_1 =",beta_hat[2]))
+cat(paste("\nbeta_2 =",beta_hat[3]))
+cat(paste("\nbeta_3 =",beta_hat[4]))
+```
+
+Calculating the t statistic for the coefficient estimates.
+
+Note: All the calculated parameters here were not obtained using lm() fxn.
+
+```{r}
+# calculating the residuals or error terms
+residuals <- Y - X %*% beta_hat
+
+SSE = sum(residuals**2)
+
+# Degrees of freedom , SSE
+df_SSE = nrow(X) - ncol(X) # -1 is not subtracted here since an extra column 
+# containing 1s is already added to X
+
+# Variance-covariance matrix of coefficient estimates
+var_cov_matrix = SSE / df_SSE * solve(t(X) %*% X)
+
+# Standard errors in coefficient estimates
+se_beta = sqrt(diag(var_cov_matrix))
+
+# t-statistics
+t_statistics <- beta_hat / se_beta
+
+for (i in 1:3){
+  cat(paste0('\nt_statistic for beta_',i,' = ',t_statistics[i]))
+}
+```
+
+#### D
+
+Calculating R\^2 and adjusted_R\^2.
+
+We need to calculate total sum of squares(SST), then we can use SSE(calculated above) and SST to calculate R\^2.
+
+```{r}
+SST = sum((Y-mean(Y))**2)
+r_squared = 1 - SSE/SST
+cat(paste("R_Squared =",r_squared))
+```
+
+We can calculate adjusted_r_squared by subtracting the ratio of MSE/MST by 1. In other words Adjusted_R_Squared = 1- MSE/MST . Lets calculate MSE and MST and use them to obtain Adjusted_R_Squared.
+
+```{r}
+df_SST = nrow(X) - 1
+MSE = SSE / df_SSE
+MST = SST / df_SST
+adjusted_r_squared = 1- MSE/MST
+cat(paste("Adjusted_R_Squared =",adjusted_r_squared))
+```
+
+#### E
+
+Checking the significance of the model using f test.
+
+```{r}
+SSR=SST-SSE
+df_SSR = df_SST-df_SSE
+F_statistic = MSR/MSE
+# Calculating the p-value
+p_value = pf(F_statistic, df_SSR, df_SSE, lower.tail = FALSE)
+
+
+cat("F-statistic:", F_statistic, "\n")
+cat("Degrees of freedom (Model, Residual/Errors):", df_SSR, ",",
+    df_SSE, "\n")
+cat("P-value =", p_value, "\n")
+```
+
+The p-value has come out to be 3.27345 X 10\^(-8) which is lesser than 0.05 and therefore outside the critical region in F-distribution, we reject the null hypothesis that (beta_1 = beta_2 = beta_3 = 0) and accept the alternate hypothesis that not all among beta_k for i=1,2,3 are zero.This tells us that the regression model is statistically significant and it is not by chance that not all among beta_k for i=1,2,3 are zero.
+
+#### F
+
+Testing the relation between Pearson's correlation coefficient and r_squared.
+
+```{r}
+Y_pred=X %*% beta_hat
+correlation_coeff= (sum((Y - mean(Y)) * (Y_pred - mean(Y_pred)))) / 
+  sqrt(sum((Y - mean(Y))^2) * sum((Y_pred - mean(Y_pred))^2))
+cat(paste("R Squared =",r_squared))
+cat(paste("\nSquare of Pearson's correlation coefficient =",
+          correlation_coeff**2))
+cat(paste("\nAre the two values obtained above equal ? :",all.equal(r_squared,correlation_coeff**2)))
+```
+
+#### G
+
+Calculate the 95% CI on the mean number of games won(y) by a team when x2 = 2300,x7 = 56, x8 = 2100.
+
+```{r}
+x_df=data.frame(x2 = 2300,x7 = 56, x8 = 2100)
+mean_y_pred_given_x1 = predict(model, newdata = x_df, interval = "confidence", level = 0.95)
+mean_y_pred_given_x1
+```
+
+Based on our model, we are 95 % confident that the true mean number of games won by a team(y) for the given input lies within \[6.436203,7.996645\].
+
+#### H
+
+Fitting the linear regression model using x7 and x8.
+
+```{r}
+model = lm(y ~ x7 +x8, data = football_df)
+summary(model)
+```
+
+Computing the error sum of squares, SSE for the current model.
+
+```{r}
+#making predictions on existing data 
+y_pred=predict(model)
+SSE=sum((football_df$y-y_pred)**2)
+cat(paste("Total Sum of Squares of Errors, SSE =",SSE))
+```
+
+#### I
+
+```{r}
+SST = sum((football_df$y-mean(football_df$y))**2)
+SSR=SST-SSE
+
+df_SSR= ncol(select(football_df,x7,x8))
+df_SSE= nrow(football_df) - ncol(select(football_df,x7,x8)) -1
+
+MSE=SSE/df_SSE
+MSR=SSR/df_SSR
+
+F_statistic = MSR/MSE
+# Calculating the p-value
+p_value = pf(F_statistic, df_SSR, df_SSE, lower.tail = FALSE)
+
+
+cat("F-statistic:", F_statistic, "\n")
+cat("Degrees of freedom (Model, Residual/Errors):", df_SSR, ",", df_SSE, "\n")
+cat("P-value =", p_value, "\n")
+```
+
+The p-value has come out to be 4.9349 X 10\^(-5) which is lesser than 0.05 and therefore outside the critical region in F-distribution, we reject the null hypothesis that (beta_1 = beta_2 = 0) and accept the alternate hypothesis that not all among beta_k for i=1,2 are zero.This tells us that the regression model is statistically significant and it is not by chance that not all among beta_k for i=1,2 are zero.
+
+#### J
+
+Computing R\^2 and Adjusted R\^2 for the new model.
+
+```{r}
+df_SST = df_SSE + df_SSR
+
+MSE = SSE / df_SSE
+MST = SST / df_SST
+
+r_squared = 1 - SSE/SST
+adjusted_r_squared = 1- MSE/MST
+
+cat(paste("R_Squared =",r_squared))
+cat(paste("\nAdjusted_R_Squared =",adjusted_r_squared))
+```
+
+#### K
+
+Calculate the 95% CI on the mean number of games won(y) by a team when x7 = 56, x8 = 2100.
+
+```{r}
+x_df=data.frame(x7 = 56, x8 = 2100)
+mean_y_pred_given_x2 = predict(model, newdata = x_df, 
+                               interval = "confidence", level = 0.95)
+mean_y_pred_given_x2
+```
+
+Based on our model, we are 95 % confident that the true mean number of games won by a team(y) for the given input lies within \[5.828643,8.023842\]. Lets compare the length of intervals in (h) and (g).
+
+```{r}
+cat(paste("length of confidence interval in (g) =",
+          mean_y_pred_given_x1[3]-mean_y_pred_given_x1[2]))
+cat(paste("\nlength of confidence interval in (k) =",
+          mean_y_pred_given_x2[3]-mean_y_pred_given_x2[2]))
+```
+
+Since,the R\^2 value for the current model is lesser than the previous model, its not able to explain as much variation as the previous model was able to explain. Consequently, the width of the 95% CI for mean number of games won by a team(y) has increased from the previous model to this model for the identical input.
+
+#### L
+
+Lets check the drop in adjusted_r_squared value after removing x2 from the model.
+
+```{r}
+adjusted_r_squared_previous=summary(model1)$adj.r.squared
+adjusted_r_squared_current=summary(model)$adj.r.squared
+
+cat(paste("Adjusted R Squared for model with covariates x2,x7,x8 =",
+          adjusted_r_squared_previous))
+
+cat(paste("\nAdjusted R Squared for model with covariates x7,x8 =",
+          adjusted_r_squared_current))
+
+cat(paste("\n% Percentage Drop in Adjusted R Squared Value =",round(((adjusted_r_squared_previous-adjusted_r_squared_current)/adjusted_r_squared_previous)*100),'%'))
+```
+
+The higher value of Adjusted R Squared in the first model suggests that x2 contributed significantly to explain the variation in the response.Also, x2 provided valuable information which x7 and x8 alone aren't able to capture for the variation in y which is a reason for decline in Adjusted R Squared value in the second model. And as for predictions, its clear from **(k)** that removing x2 from model has had a significant effect on the predictions which widened the width of the confidence intervals in the 2nd model for a mean response with given input. Note: The input for predictions was identical in both the models.
+
+### Question 5
+
+Reading data from bikesharing.csv
+
+```{r}
+bikesharing_df = read.csv('bikesharing.csv')
+head(bikesharing_df,width=4,strict.width='cut')
+```
+
+#### A
+
+We can convert the mnth variable in dataset by explicitly specifying the levels from (1 - 12) and labels for the levels in the order (January-December) in the arguments for the factor function,by default the first level will be taken as reference level, and reassigning the result obtained to **mnth** variable in the dataset.
+
+```{r}
+months=c("January", "February","March","April","May","June","July","August",
+         "September","October","November","December")
+
+bikesharing_df$mnth = factor(bikesharing_df$mnth,levels=c(1:12), labels=months)
+
+#lets check the levels
+levels(bikesharing_df$mnth)
+```
+
+#### B
+
+Fitting a linear regression model with **cnt** as the response and **hum**, **windspeed**, **temp**, **mnth** as the predictors.
+
+```{r}
+
+model = lm(cnt ~ hum + windspeed + temp + mnth,data=bikesharing_df)
+summary(model)
+```
+
+The model summary indeed proves that January is being treated as the reference category,this is because R treats the first level of the factor as reference and when converting the mnth variable to into a factor,we explicitly passed levels and labels in such a way that January is treated as the reference category.
+
+#### C
+
+According to the summary several months have statistically significant coefficients (e.g. March, April, May, July, September, October, November, December). This suggests that the month of the year variable is an important predictor for the response variable, at least for the months mentioned. <br>
+
+#### D
+
+We can deduce which months will have different number of average bike rentals taking January as the reference using the model summary.The months which are having at least one star in the model summary are significantly different from January in terms of average bike rentals at significance level of 5%. The months are : April, May, September, October, November, December. 
+
+#### E
+
+Given hum = 0.4, temp = 0.3, windspeed = 0.65.<br> Lets try to find the average rentals each month and list them down in a table.<br>
+
+```{r}
+#solution for part e
+
+#defining input data with a record containing each month
+input_data = expand.grid(
+  hum = 0.4,
+  temp = 0.3,
+  windspeed = 0.65,
+  mnth = levels(bikesharing_df$mnth)
+)
+
+cnt_pred = predict(model, newdata = input_data)
+
+results = data.frame(Month = levels(bikesharing_df$mnth), Predicted_Rentals = cnt_pred)
+#Table for predicted rentals for the given input
+kable(results)
+```
