@@ -9,9 +9,8 @@ Assignment 1 involves analyzing various datasets and performing multiple regress
 
 - **Files**:
   - `Assignment1.pdf`: Assignment questions.
-  - `data_simulation.csv`: Dataset used for the analysis in Question 4.
-  - `houses.csv`: Dataset used for the analysis in Question 5.
-  - `abalone.csv`: Dataset used for the analysis in Question 6.
+  - `data_simulation.csv`: Dataset used for the analysis in the assignment.
+  - `abalone.csv`: Dataset used for the analysis in the assignment.
   - `Solution.html`: Solution hosted on GitHub Pages.
   - `Solution.qmd`: Quarto Markdown file with the solutions.
 
@@ -22,9 +21,9 @@ Assignment 2 focuses on model selection and multiple regression analysis using t
 
 - **Files**:
   - `Assignment 2 MRA.pdf`: Assignment questions.
-  - `Crime.csv`: Dataset used for the analysis in Question 3.
-  - `football.csv`: Dataset used for the analysis in Question 4.
-  - `bikesharing.csv`: Dataset used for the analysis in Question 5.
+  - `Crime.csv`: Dataset used for the analysis in the assignment.
+  - `football.csv`: Dataset used for the analysis in the assignment.
+  - `bikesharing.csv`: Dataset used for the analysis in the assignment.
   - `Solution.html`: Solution hosted on GitHub Pages.
   - `Solution.qmd`: Quarto Markdown file with the solutions.
 
